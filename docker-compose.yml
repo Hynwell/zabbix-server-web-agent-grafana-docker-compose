@@ -1,19 +1,16 @@
 version: '3.7'
 
 volumes:
-#  zabbix-data:
   grafana-data:
 
 services:
 
-  # Настройка базы данных
   zabbix-postgres:
     container_name: zabbix-postgres
     image: postgres:15
     networks:
       - network-zabbix
     restart: always
-    #shm_size: 64M
     command:
       - "postgres"
       - "-c"
@@ -49,13 +46,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       PG_DATA: /var/lib/postgresql/data/pgdata
-
     ports:
       - ${DB_SERVER_PORT}:5432
     volumes:
-      - ./zabbix/postgres-data:/var/lib/postgresql/data
+      - ./postgres-data:/var/lib/postgresql/data
 
-  # Настройка заббикс сервера
   zabbix-server:
     container_name: zabbix-server
     image: zabbix/zabbix-server-pgsql:ubuntu-6.0-latest
@@ -78,7 +73,6 @@ services:
     depends_on:
       - zabbix-postgres
 
-  # Настройка заббикс вэб-интерфейса
   zabbix-web:
     container_name: zabbix-web
     image: zabbix/zabbix-web-apache-pgsql:ubuntu-6.0-latest
@@ -121,7 +115,6 @@ services:
       - zabbix-server
       - zabbix-web
    
-  # Настройка графаны
   grafana:
     container_name: grafana
     image: grafana/grafana:9.3.2
