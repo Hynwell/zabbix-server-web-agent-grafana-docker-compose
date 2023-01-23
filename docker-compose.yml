@@ -1,0 +1,144 @@
+version: '3.7'
+
+volumes:
+#  zabbix-data:
+  grafana-data:
+
+services:
+
+  # Настройка базы данных
+  zabbix-postgres:
+    container_name: zabbix-postgres
+    image: postgres:15
+    networks:
+      - network-zabbix
+    restart: always
+    #shm_size: 64M
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=50"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "effective_cache_size=4GB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=512MB"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "temp_file_limit=10GB"
+      - "-c"
+      - "log_min_duration_statement=200ms"
+      - "-c"
+      - "idle_in_transaction_session_timeout=10s"
+      - "-c"
+      - "lock_timeout=1s"
+      - "-c"
+      - "statement_timeout=60s"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.max=10000"
+      - "-c"
+      - "pg_stat_statements.track=all"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PG_DATA: /var/lib/postgresql/data/pgdata
+
+    ports:
+      - ${DB_SERVER_PORT}:5432
+    volumes:
+      - ./zabbix/postgres-data:/var/lib/postgresql/data
+
+  # Настройка заббикс сервера
+  zabbix-server:
+    container_name: zabbix-server
+    image: zabbix/zabbix-server-pgsql:ubuntu-6.0-latest
+    networks:
+      - network-zabbix
+    restart: always
+    ports:
+      - "10051:10051"
+#    volumes:
+#      - ./config:/etc/zabbix
+#      - zabbix-data:/usr/lib/zabbix/alertscripts
+#      - zabbix-data:/usr/lib/zabbix/externalscripts
+    environment:
+      TZ: "Europe/Moscow"
+      DB_SERVER_HOST: ${DB_SERVER_HOST}      
+      DB_SERVER_PORT: ${DB_SERVER_PORT}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    depends_on:
+      - zabbix-postgres
+
+  # Настройка заббикс вэб-интерфейса
+  zabbix-web:
+    container_name: zabbix-web
+    image: zabbix/zabbix-web-apache-pgsql:ubuntu-6.0-latest
+    networks:
+      - network-zabbix
+    restart: always
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      TZ: "Europe/Moscow"
+      DB_SERVER_HOST: ${DB_SERVER_HOST}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      ZBX_SERVER_HOST: zabbix-server
+    depends_on:
+      - zabbix-postgres
+      - zabbix-server
+
+  # Настройка заббикс агента    
+  zabbix-agent:
+    container_name: zabbix-agent
+    image: zabbix/zabbix-agent:alpine-6.0-latest
+    user: root
+    networks:
+      - network-zabbix
+    restart: always
+    privileged: true
+    volumes:
+      - ./zabbix/agent:/etc/zabbix/zabbix_agentd.d
+      - ./zabbix/agent:/var/lib/zabbix/modules
+    ports:
+      - "10050:10050"
+    environment:
+      - ZBX_HOSTNAME=zabbix-server
+      - ZBX_SERVER_HOST=zabbix-server
+    depends_on:
+      - zabbix-postgres
+      - zabbix-server
+      - zabbix-web
+   
+  # Настройка графаны
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:9.3.2
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - grafana-data:/etc/grafana/provisioning
+    networks:
+      - network-zabbix
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_INSTALL_PLUGINS=alexanderzobnin-zabbix-app
+    depends_on:
+      - zabbix-postgres
+      - zabbix-server
+      - zabbix-web
+networks:
+  network-zabbix:
+
