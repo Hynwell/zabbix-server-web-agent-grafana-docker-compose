@@ -4,7 +4,6 @@ volumes:
   grafana-data:
 
 services:
-
   zabbix-postgres:
     container_name: zabbix-postgres
     image: postgres:15
@@ -93,7 +92,7 @@ services:
       - zabbix-postgres
       - zabbix-server
 
-  # Настройка заббикс агента    
+   
   zabbix-agent:
     container_name: zabbix-agent
     image: zabbix/zabbix-agent:alpine-6.0-latest
